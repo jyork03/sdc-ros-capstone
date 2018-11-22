@@ -52,6 +52,7 @@ class TLDetector(object):
         self.last_state = TrafficLight.UNKNOWN
         self.last_wp = -1
         self.state_count = 0
+        self.img_idx = 0
 
         rospy.spin()
 
@@ -125,16 +126,17 @@ class TLDetector(object):
 
         """
 
+        if(not self.has_image):
+            self.prev_light_loc = None
+            return False
+
+        cv_image = self.bridge.imgmsg_to_cv2(self.camera_image, "bgr8")
+        cv2.imwrite('dataset/{}-{}.png'.format(self.img_idx, light.state), cv_image)
+        rospy.logwarn('Writing image to dataset/{}-{}.png'.format(self.img_idx, light.state))
+        self.img_idx += 1
+        # #Get classification
         # for testing, just return the light state
         return light.state
-
-        # if(not self.has_image):
-        #     self.prev_light_loc = None
-        #     return False
-
-        # cv_image = self.bridge.imgmsg_to_cv2(self.camera_image, "bgr8")
-
-        # #Get classification
         # return self.light_classifier.get_classification(cv_image)
 
     def process_traffic_lights(self):
