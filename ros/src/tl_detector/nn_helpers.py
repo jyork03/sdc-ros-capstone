@@ -45,6 +45,7 @@ def one_hot_encode(x):
     return one_hot
 
 def freeze_session(session, keep_var_names=None, output_names=None, clear_devices=True):
+    # Source: https://stackoverflow.com/a/45466355/3149695
     """
     Freezes the state of a session into a pruned computation graph.
 
@@ -73,6 +74,7 @@ def freeze_session(session, keep_var_names=None, output_names=None, clear_device
         return frozen_graph
 
 def load_graph(frozen_graph_filename):
+    # Source: https://blog.metaflow.fr/tensorflow-how-to-freeze-a-model-and-serve-it-with-a-python-api-d4f3596b3adc
     # We load the protobuf file from the disk and parse it to retrieve the 
     # unserialized graph_def
     with tf.gfile.GFile(frozen_graph_filename, "rb") as f:

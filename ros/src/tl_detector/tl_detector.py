@@ -64,6 +64,7 @@ class TLDetector(object):
         rospy.spin()
 
     def load_graph(self, frozen_graph_filename):
+        # Source: https://blog.metaflow.fr/tensorflow-how-to-freeze-a-model-and-serve-it-with-a-python-api-d4f3596b3adc
         # We load the protobuf file from the disk and parse it to retrieve the 
         # unserialized graph_def
         with tensorflow.gfile.GFile(frozen_graph_filename, "rb") as f:
