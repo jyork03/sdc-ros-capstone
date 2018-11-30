@@ -11,6 +11,8 @@ from scipy.spatial import KDTree
 import tf
 import cv2
 import yaml
+import tensorflow
+import keras
 
 STATE_COUNT_THRESHOLD = 3
 
@@ -44,17 +46,36 @@ class TLDetector(object):
 
         self.upcoming_red_light_pub = rospy.Publisher('/traffic_waypoint', Int32, queue_size=1)
 
+        graph = self.load_graph('/capstone/ros/src/tl_detector/saved_models/traffic_light_classifier.pb')
+
         self.bridge = CvBridge()
-        self.light_classifier = TLClassifier()
+        self.light_classifier = TLClassifier(graph)
         self.listener = tf.TransformListener()
 
         self.state = TrafficLight.UNKNOWN
         self.last_state = TrafficLight.UNKNOWN
         self.last_wp = -1
+        self.last_car_wp = 0
         self.state_count = 0
         self.img_idx = 0
 
+        # model = keras.models.load_model('/capstone/ros/src/tl_detector/traffic_light_classifier.h5')
+
         rospy.spin()
+
+    def load_graph(self, frozen_graph_filename):
+        # We load the protobuf file from the disk and parse it to retrieve the 
+        # unserialized graph_def
+        with tensorflow.gfile.GFile(frozen_graph_filename, "rb") as f:
+            graph_def = tensorflow.GraphDef()
+            graph_def.ParseFromString(f.read())
+
+        # Then, we import the graph_def into a new Graph and returns it 
+        with tensorflow.Graph().as_default() as graph:
+            # The name var will prefix every op/nodes in your graph
+            # Since we load everything in a new graph, this is not needed
+            tensorflow.import_graph_def(graph_def, name="prefix")
+        return graph
 
     def pose_cb(self, msg):
         self.pose = msg
@@ -80,7 +101,7 @@ class TLDetector(object):
         self.camera_image = msg
         light_wp, state = self.process_traffic_lights()
 
-        rospy.logwarn("Closest light wp: {0}\nAnd light state: {1}".format(light_wp, state))
+        # rospy.logwarn("Closest light wp: {0}\nAnd light state: {1}".format(light_wp, state))
 
         '''
         Publish upcoming red lights at camera frequency.
@@ -93,7 +114,8 @@ class TLDetector(object):
             self.state = state
         elif self.state_count >= STATE_COUNT_THRESHOLD:
             self.last_state = self.state
-            light_wp = light_wp if state == TrafficLight.RED else -1
+            # Stop on red or yellow light just to be safe
+            light_wp = light_wp if state == TrafficLight.RED or state == TrafficLight.YELLOW else -1
             self.last_wp = light_wp
             self.upcoming_red_light_pub.publish(Int32(light_wp))
         else:
@@ -115,7 +137,7 @@ class TLDetector(object):
         closest_idx = self.waypoint_tree.query([x, y], 1)[1]
         return closest_idx
 
-    def get_light_state(self, light):
+    def get_light_state(self, light, line_wp_idx, car_wp_idx):
         """Determines the current color of the traffic light
 
         Args:
@@ -126,17 +148,34 @@ class TLDetector(object):
 
         """
 
-        if(not self.has_image):
+        state = TrafficLight.UNKNOWN
+
+        if not self.has_image:
             self.prev_light_loc = None
             return False
 
-        cv_image = self.bridge.imgmsg_to_cv2(self.camera_image, "bgr8")
-        cv2.imwrite('dataset/{}-{}.png'.format(self.img_idx, light.state), cv_image)
-        rospy.logwarn('Writing image to dataset/{}-{}.png'.format(self.img_idx, light.state))
-        self.img_idx += 1
+        # rospy.logwarn("Next line wp: {}, Car Wp: {}".format(line_wp_idx, car_wp_idx))
+        if line_wp_idx - car_wp_idx < 50:
+            cv_image = self.bridge.imgmsg_to_cv2(self.camera_image, "bgr8")
+            state = self.light_classifier.get_classification(cv_image)
+
+        # ## Code below used to capture training image dataset.
+        # if self.last_car_wp == 0:
+        #     self.last_car_wp = car_wp_idx
+        # elif self.last_car_wp != car_wp_idx:
+        # #     rospy.logwarn("car_wp_idx: {}".format(car_wp_idx))
+        #     self.last_car_wp = car_wp_idx
+        #     if line_wp_idx - car_wp_idx < 100:
+        #         cv_image = self.bridge.imgmsg_to_cv2(self.camera_image, "bgr8")
+        #         cv2.imwrite('dataset/{}-{}-{}.png'.format(self.img_idx, line_wp_idx, light.state), cv_image)
+        #         rospy.loginfo('Writing image to dataset/{}-{}-{}.png'.format(self.img_idx, line_wp_idx, light.state))
+        #         self.img_idx += 1
+
         # #Get classification
         # for testing, just return the light state
-        return light.state
+        rospy.loginfo("State: {}".format(state))
+        return state
+        # return light.state
         # return self.light_classifier.get_classification(cv_image)
 
     def process_traffic_lights(self):
@@ -171,7 +210,7 @@ class TLDetector(object):
                     line_wp_idx = temp_wp_idx
 
         if closest_light:
-            state = self.get_light_state(closest_light)
+            state = self.get_light_state(closest_light, line_wp_idx, car_wp_idx)
             return line_wp_idx, state
 
         return -1, TrafficLight.UNKNOWN

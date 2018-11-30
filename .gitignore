@@ -5,3 +5,6 @@ devel
 
 profile.tmp
 .vscode
+
+**/.ipynb_checkpoints
+**/dataset/*.png
