@@ -46,7 +46,7 @@ class TLDetector(object):
 
         self.upcoming_red_light_pub = rospy.Publisher('/traffic_waypoint', Int32, queue_size=1)
 
-        graph = self.load_graph('/capstone/ros/src/tl_detector/saved_models/traffic_light_classifier.pb')
+        graph = self.load_graph('./saved_models/traffic_light_classifier.pb')
 
         self.bridge = CvBridge()
         self.light_classifier = TLClassifier(graph)
