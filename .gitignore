@@ -8,4 +8,5 @@ profile.tmp
 
 **/.ipynb_checkpoints
 **/dataset/*.png
+**/dataset_site/**/*.jpg
 *.bag

@@ -26,6 +26,8 @@ class TLDetector(object):
         self.waypoints_2d = None
         self.camera_image = None
         self.lights = []
+        rospy.loginfo('Creating CvBridge')
+        self.bridge = CvBridge()
 
         sub1 = rospy.Subscriber('/current_pose', PoseStamped, self.pose_cb)
         sub2 = rospy.Subscriber('/base_waypoints', Lane, self.waypoints_cb)
@@ -45,10 +47,16 @@ class TLDetector(object):
         self.config = yaml.load(config_string)
 
         self.upcoming_red_light_pub = rospy.Publisher('/traffic_waypoint', Int32, queue_size=1)
+        
+        rospy.loginfo(self.config)
 
-        graph = self.load_graph('./saved_models/traffic_light_classifier.pb')
-
-        self.bridge = CvBridge()
+        if self.config['is_site']:
+            rospy.loginfo('Loading Site Traffic Light Graph')
+            graph = self.load_graph('./saved_models/carla_traffic_light_classifier.pb')
+        else:
+            rospy.loginfo('Loading Simulator Traffic Light Graph')
+            graph = self.load_graph('./saved_models/traffic_light_classifier.pb')
+        
         self.light_classifier = TLClassifier(graph)
         self.listener = tf.TransformListener()
 
@@ -156,7 +164,7 @@ class TLDetector(object):
             return False
 
         # rospy.logwarn("Next line wp: {}, Car Wp: {}".format(line_wp_idx, car_wp_idx))
-        if line_wp_idx - car_wp_idx < 50:
+        if line_wp_idx - car_wp_idx < 50 and self.bridge:
             cv_image = self.bridge.imgmsg_to_cv2(self.camera_image, "bgr8")
             state = self.light_classifier.get_classification(cv_image)
 

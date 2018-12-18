@@ -7,8 +7,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 import tensorflow as tf
 
-def get_labeled_images():
-    image_paths = np.array(glob.glob('dataset/*.png'))
+def get_labeled_images(path):
+    image_paths = np.array(glob.glob(path))
     images = []
     labels = []
     for path in image_paths:
